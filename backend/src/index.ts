@@ -1,0 +1,28 @@
+import express from 'express'
+import cors from 'cors'
+
+const app = express()
+const PORT = process.env.SERVER_PORT || 4000
+
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true,
+}))
+app.use(express.json())
+
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// TODO: 라우터 등록
+// import { authRouter } from './routes/auth'
+// import { concertRouter } from './routes/concerts'
+// app.use('/api/auth', authRouter)
+// app.use('/api/concerts', concertRouter)
+
+app.listen(PORT, () => {
+  console.log(`[backend] http://localhost:${PORT} 에서 실행 중`)
+})
+
+export default app

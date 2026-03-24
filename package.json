@@ -1,0 +1,13 @@
+{
+  "name": "concert-reservation",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"NEXT,EXPRESS\" -c \"blue,green\" \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
