@@ -6,3 +6,20 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model Concert {
+  id          Int      @id @default(autoincrement())
+  title       String
+  date        DateTime
+  venue       String
+  totalSeats  Int
+  createdAt   DateTime @default(now())
+}
