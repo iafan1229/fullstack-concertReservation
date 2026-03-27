@@ -1,5 +1,9 @@
 # 콘서트 예약 시스템
 
+## ERD
+
+![ERD](erd.png)
+
 ## DB 설계
 
 ```dbml
