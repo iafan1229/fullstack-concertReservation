@@ -7,19 +7,140 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────
+// 사용자
+// ─────────────────────────────────────────────
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @unique @map("user_id")
   name      String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  balance        UserBalance?
+  balanceHistory BalanceHistory[]
+  queues         Queue[]
+  reservations   Reservation[]
+
+  @@map("users")
 }
 
+// ─────────────────────────────────────────────
+// 잔액
+// ─────────────────────────────────────────────
+model UserBalance {
+  id      BigInt @id @default(autoincrement())
+  userId  BigInt @unique @map("user_id")
+  balance BigInt @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_balances")
+}
+
+model BalanceHistory {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  amount    BigInt
+  type      String   // CHARGE | USE | REFUND
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("balance_histories")
+}
+
+// ─────────────────────────────────────────────
+// 콘서트
+// ─────────────────────────────────────────────
 model Concert {
-  id          Int      @id @default(autoincrement())
-  title       String
-  date        DateTime
-  venue       String
-  totalSeats  Int
-  createdAt   DateTime @default(now())
+  id          BigInt @id @default(autoincrement())
+  concertId   String @unique @map("concert_id")
+  concertName String @map("concert_name")
+
+  schedules ConcertSchedule[]
+
+  @@map("concerts")
+}
+
+model ConcertSchedule {
+  id        BigInt   @id @default(autoincrement())
+  concertId BigInt   @map("concert_id")
+  startAt   DateTime @map("start_at")
+  endAt     DateTime @map("end_at")
+  venue     String?
+
+  concert Concert @relation(fields: [concertId], references: [id])
+  seats   Seat[]
+  queues  Queue[]
+
+  @@map("concert_schedules")
+}
+
+// ─────────────────────────────────────────────
+// 좌석
+// ─────────────────────────────────────────────
+model Seat {
+  id         BigInt @id @default(autoincrement())
+  scheduleId BigInt @map("schedule_id")
+  seatNo     String @map("seat_no")
+
+  schedule     ConcertSchedule @relation(fields: [scheduleId], references: [id])
+  reservations Reservation[]
+
+  @@unique([scheduleId, seatNo])
+  @@map("seats")
+}
+
+// ─────────────────────────────────────────────
+// 대기열
+// ─────────────────────────────────────────────
+model Queue {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  scheduleId BigInt   @map("schedule_id")
+  enteredAt  DateTime @default(now()) @map("entered_at")
+  token      String?  @unique
+  status     String   @default("TEMP") // TEMP | CONFIRMED | CANCELED | EXPIRED
+
+  user         User            @relation(fields: [userId], references: [id])
+  schedule     ConcertSchedule @relation(fields: [scheduleId], references: [id])
+  reservations Reservation[]
+
+  @@map("queues")
+}
+
+// ─────────────────────────────────────────────
+// 예약
+// ─────────────────────────────────────────────
+model Reservation {
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt    @map("user_id")
+  seatId      BigInt    @map("seat_id")
+  status      String    // HELD | CONFIRMED | EXPIRED
+  heldAt      DateTime? @map("held_at")
+  expiredAt   DateTime? @map("expired_at")
+  confirmedAt DateTime? @map("confirmed_at")
+  queueId     BigInt?   @map("queue_id")
+
+  user    User     @relation(fields: [userId], references: [id])
+  seat    Seat     @relation(fields: [seatId], references: [id])
+  queue   Queue?   @relation(fields: [queueId], references: [id])
+  payment Payment?
+
+  @@map("reservations")
+}
+
+// ─────────────────────────────────────────────
+// 결제
+// ─────────────────────────────────────────────
+model Payment {
+  id            BigInt    @id @default(autoincrement())
+  reservationId BigInt    @unique @map("reservation_id")
+  amount        BigInt
+  status        String    @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
+  paidAt        DateTime? @map("paid_at")
+
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+
+  @@map("payments")
 }
