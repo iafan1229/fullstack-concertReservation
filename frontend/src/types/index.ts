@@ -25,3 +25,25 @@ export interface QueueStatusResponse {
   position: number
   estimatedWaitSeconds: number
 }
+
+export interface ConcertItem {
+  id: string
+  concertId: string
+  concertName: string
+  scheduleCount: number
+}
+
+export interface ScheduleItem {
+  id: string
+  startAt: string
+  endAt: string
+  venue: string | null
+  totalSeats: number
+  availableSeatCount: number
+}
+
+export interface SeatItem {
+  id: string
+  seatNo: string
+  available: boolean
+}

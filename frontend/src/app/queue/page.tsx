@@ -24,11 +24,11 @@ type Phase = 'idle' | 'polling' | 'confirmed' | 'error'
 
 export default function QueuePage() {
   const router = useRouter()
-  const [scheduleId, setScheduleId] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
   const [queueInfo, setQueueInfo] = useState<QueueStatusResponse | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [userName, setUserName] = useState('')
+  const [loading, setLoading] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const queueTokenRef = useRef<string | null>(null)
 
@@ -66,25 +66,15 @@ export default function QueuePage() {
     }
   }, [])
 
-  const handleEnterQueue = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEnterQueue = async () => {
     setErrorMsg('')
-
-    const id = Number(scheduleId)
-    if (!id || id < 1) {
-      setErrorMsg('올바른 스케줄 ID를 입력해주세요.')
-      return
-    }
+    setLoading(true)
 
     const token = localStorage.getItem('token')
     if (!token) { router.push('/login'); return }
 
     try {
-      const res = await api.post<QueueTokenResponse>(
-        '/api/queue/token',
-        { scheduleId: id },
-        token
-      )
+      const res = await api.post<QueueTokenResponse>('/api/queue/token', {}, token)
       queueTokenRef.current = res.queueToken
       setQueueInfo({ status: res.status, position: res.position, estimatedWaitSeconds: res.estimatedWaitSeconds })
 
@@ -97,6 +87,8 @@ export default function QueuePage() {
       }
     } catch (err: any) {
       setErrorMsg(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -140,9 +132,9 @@ export default function QueuePage() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-8 py-16">
 
-        {/* IDLE: enter queue form */}
+        {/* IDLE */}
         {phase === 'idle' && (
-          <div className="w-full max-w-md animate-fade-up">
+          <div className="w-full max-w-md text-center animate-fade-up">
             <p
               className="text-[10px] tracking-[0.4em] uppercase mb-4"
               style={{ fontFamily: 'var(--font-mono)', color: '#e8a020' }}
@@ -150,7 +142,7 @@ export default function QueuePage() {
               Step 03
             </p>
             <h1
-              className="mb-2"
+              className="mb-4"
               style={{
                 fontFamily: 'var(--font-crimson)',
                 fontSize: '3.5rem',
@@ -167,69 +159,44 @@ export default function QueuePage() {
               className="mb-10"
               style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#4a4540' }}
             >
-              스케줄 ID를 입력해 대기열에 참여하세요.
+              버튼을 눌러 서비스 대기열에 참여하세요.
+              <br />
+              순서가 되면 콘서트 예약을 진행할 수 있습니다.
             </p>
 
-            <form onSubmit={handleEnterQueue} className="flex flex-col gap-8">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="scheduleId"
-                  className="text-[10px] tracking-[0.3em] uppercase"
-                  style={{ fontFamily: 'var(--font-mono)', color: '#5a5550' }}
-                >
-                  Schedule ID
-                </label>
-                <input
-                  id="scheduleId"
-                  type="number"
-                  min={1}
-                  value={scheduleId}
-                  onChange={(e) => setScheduleId(e.target.value)}
-                  className="w-full bg-transparent py-3 outline-none placeholder-[#2a2520]"
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '13px',
-                    color: '#ece6de',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  }}
-                  placeholder="예: 1"
-                />
-              </div>
-
-              {errorMsg && (
-                <p
-                  className="text-xs py-3 px-4"
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    color: '#e85020',
-                    background: 'rgba(232,80,32,0.08)',
-                    borderLeft: '2px solid #e85020',
-                  }}
-                >
-                  {errorMsg}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                className="py-4 text-[11px] tracking-[0.25em] uppercase"
+            {errorMsg && (
+              <p
+                className="mb-6 text-xs py-3 px-4 text-left"
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  background: '#e8a020',
-                  color: '#080808',
-                  fontWeight: 500,
+                  color: '#e85020',
+                  background: 'rgba(232,80,32,0.08)',
+                  borderLeft: '2px solid #e85020',
                 }}
               >
-                대기열 입장하기
-              </button>
-            </form>
+                {errorMsg}
+              </p>
+            )}
+
+            <button
+              onClick={handleEnterQueue}
+              disabled={loading}
+              className="w-full py-4 text-[11px] tracking-[0.25em] uppercase transition-opacity disabled:opacity-40"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                background: '#e8a020',
+                color: '#080808',
+                fontWeight: 500,
+              }}
+            >
+              {loading ? '처리 중...' : '대기열 입장하기'}
+            </button>
           </div>
         )}
 
-        {/* POLLING: queue status */}
+        {/* POLLING / CONFIRMED */}
         {(phase === 'polling' || phase === 'confirmed') && queueInfo && (
           <div className="w-full max-w-lg text-center animate-fade-up">
-
             {/* Status badge */}
             <div className="flex items-center justify-center gap-2 mb-10">
               <span
@@ -246,7 +213,6 @@ export default function QueuePage() {
 
             {phase === 'polling' ? (
               <>
-                {/* Position */}
                 <div className="relative mb-4">
                   <p
                     className="text-[10px] tracking-[0.4em] uppercase mb-2"
@@ -275,15 +241,8 @@ export default function QueuePage() {
                     {queueInfo.position === 0 ? '처리 중...' : `${queueInfo.estimatedWaitSeconds}초 예상`}
                   </p>
                 </div>
-
-                <div
-                  className="w-24 h-px mx-auto my-8"
-                  style={{ background: 'rgba(255,255,255,0.06)' }}
-                />
-
-                <p
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#3a3530' }}
-                >
+                <div className="w-24 h-px mx-auto my-8" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#3a3530' }}>
                   3초마다 자동으로 갱신됩니다
                 </p>
               </>
@@ -311,9 +270,9 @@ export default function QueuePage() {
                     서비스를 이용할 수 있습니다.
                   </p>
                 </div>
-
-                <button
-                  className="px-8 py-4 text-[11px] tracking-[0.25em] uppercase"
+                <Link
+                  href="/concerts"
+                  className="inline-block px-8 py-4 text-[11px] tracking-[0.25em] uppercase"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     background: '#5a9050',
@@ -322,7 +281,7 @@ export default function QueuePage() {
                   }}
                 >
                   좌석 예약하러 가기 →
-                </button>
+                </Link>
               </>
             )}
 
