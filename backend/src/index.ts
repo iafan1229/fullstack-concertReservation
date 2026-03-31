@@ -15,11 +15,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// TODO: 라우터 등록
-// import { authRouter } from './routes/auth'
-// import { concertRouter } from './routes/concerts'
-// app.use('/api/auth', authRouter)
-// app.use('/api/concerts', concertRouter)
+import { authRouter } from './routes/auth'
+import { queueRouter } from './routes/queue'
+
+app.use('/api/auth', authRouter)
+app.use('/api/queue', queueRouter)
 
 app.listen(PORT, () => {
   console.log(`[backend] http://localhost:${PORT} 에서 실행 중`)
