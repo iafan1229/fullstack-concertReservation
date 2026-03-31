@@ -18,6 +18,7 @@ app.get('/health', (_req, res) => {
 import { authRouter } from './routes/auth'
 import { queueRouter } from './routes/queue'
 import { concertsRouter } from './routes/concerts'
+import { startQueueScheduler } from './lib/scheduler'
 
 app.use('/api/auth', authRouter)
 app.use('/api/queue', queueRouter)
@@ -25,6 +26,7 @@ app.use('/api/concerts', concertsRouter)
 
 app.listen(PORT, () => {
   console.log(`[backend] http://localhost:${PORT} 에서 실행 중`)
+  startQueueScheduler()
 })
 
 export default app

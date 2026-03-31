@@ -42,7 +42,6 @@
 |------|------|------|------|
 | id | BIGINT | PK | 내부 식별자 |
 | user_id | BIGINT | FK → User.id, NOT NULL | 대기 사용자 |
-| schedule_id | BIGINT | FK → ConcertSchedule.id, NOT NULL | 대기 중인 공연 회차 |
 | entered_at | TIMESTAMP | NOT NULL | 대기열 진입 시각 |
 | token | VARCHAR | UNIQUE | 인증 토큰 |
 | status | VARCHAR | | `TEMP` / `CONFIRMED` / `CANCELED` / `EXPIRED` |
