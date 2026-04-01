@@ -15,11 +15,10 @@
 ## 2. 핵심 기능 (Features)
 
 ### 2.1 대기열 (Queue)
-- 콘서트 스케줄별로 대기열을 관리한다.
 - 사용자가 예약 페이지 진입 시 대기열에 등록되며 고유 토큰이 발급된다.
-- 대기열 상태: `WAITING` → `ACTIVE` → `EXPIRED`
-- `ACTIVE` 상태의 사용자만 좌석 조회 및 예약이 가능하다.
-- 토큰 만료 시간: ACTIVE 진입 후 N분 (예: 5분) 내 미결제 시 만료
+- 대기열 상태: `TEMP` → `CONFIRMED` → `CANCELED` / `EXPIRED`
+- `CONFIRMED` 상태의 사용자만 좌석 조회 및 예약이 가능하다.
+- 토큰 만료 시간: CONFIRMED 진입 후 N분 (예: 5분) 내 미결제 시 만료
 
 ### 2.2 콘서트 & 좌석 조회
 - 예약 가능한 콘서트 목록 조회
@@ -35,7 +34,7 @@
 ### 2.4 잔액 충전 & 조회
 - 사용자는 포인트(잔액)를 충전할 수 있다.
 - 충전/사용 이력을 BalanceHistory로 관리한다.
-- 잔액 충전 타입: `CHARGE` / 사용 타입: `USE`
+- 잔액 충전 타입: `CHARGE` / 사용 타입: `USE` / 환불 타입: `REFUND`
 
 ### 2.5 결제
 - 임시 배정된 좌석에 대해 잔액으로 결제한다.
@@ -44,7 +43,7 @@
   - UserBalance 차감
   - BalanceHistory 기록 (USE)
   - Payment 생성
-- 결제 상태: `PENDING` → `COMPLETED` / `FAILED`
+- 결제 상태: `PENDING` → `SUCCESS` / `FAILED` / `REFUNDED`
 
 ---
 
@@ -55,6 +54,8 @@
 |------|------|------|
 | id | BIGINT PK | 내부 식별자 |
 | user_id | VARCHAR | 외부 식별자 (UUID 등) |
+| email | VARCHAR | 이메일 (UNIQUE) |
+| password | VARCHAR | 비밀번호 |
 | name | VARCHAR | 사용자 이름 |
 | created_at | TIMESTAMP | 가입일 |
 
@@ -71,7 +72,7 @@
 | id | BIGINT PK | 내부 식별자 |
 | user_id | BIGINT FK | User 참조 |
 | amount | BIGINT | 변동 금액 |
-| type | VARCHAR | `CHARGE` / `USE` |
+| type | VARCHAR | `CHARGE` / `USE` / `REFUND` |
 | created_at | TIMESTAMP | 생성일 |
 
 ### Concert (콘서트)
@@ -102,10 +103,10 @@
 |------|------|------|
 | id | BIGINT PK | 내부 식별자 |
 | user_id | BIGINT FK | User 참조 |
-| schedule_id | BIGINT FK | ConcertSchedule 참조 |
 | entered_at | TIMESTAMP | 대기열 진입 시각 |
-| token | VARCHAR | 인증 토큰 (UUID) |
-| status | VARCHAR | `WAITING` / `ACTIVE` / `EXPIRED` |
+| confirmed_at | TIMESTAMP | 활성화 시각 |
+| token | VARCHAR | 인증 토큰 (UUID, UNIQUE) |
+| status | VARCHAR | `TEMP` / `CONFIRMED` / `CANCELED` / `EXPIRED` |
 
 ### Reservation (예약)
 | 필드 | 타입 | 설명 |
@@ -125,7 +126,7 @@
 | id | BIGINT PK | 내부 식별자 |
 | reservation_id | BIGINT FK | Reservation 참조 |
 | amount | BIGINT | 결제 금액 |
-| status | VARCHAR | `PENDING` / `COMPLETED` / `FAILED` |
+| status | VARCHAR | `PENDING` / `SUCCESS` / `FAILED` / `REFUNDED` |
 | paid_at | TIMESTAMP | 결제 완료 시각 |
 
 ---
