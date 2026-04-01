@@ -3,8 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { api, refreshQueueToken } from '@/lib/api'
 import type { ConcertItem } from '@/types'
+
+const POSTER_MAP: Record<string, string> = {
+  'concert-001': '/concerts/jazz.webp',
+  'concert-002': '/concerts/iu.jpg',
+  'concert-003': '/concerts/bts.webp',
+  'concert-004': '/concerts/newjeans.jpg',
+  'concert-005': '/concerts/coldplay.jpg',
+}
 
 export default function ConcertsPage() {
   const router = useRouter()
@@ -127,52 +136,56 @@ export default function ConcertsPage() {
 
         {/* Concert grid */}
         {!loading && !error && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: 'rgba(255,255,255,0.05)' }}>
-            {concerts.map((concert, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {concerts.map((concert) => (
               <Link
                 key={concert.id}
                 href={`/concerts/${concert.concertId}/schedules`}
-                className="group flex flex-col justify-between p-8 transition-colors"
+                className="group flex flex-col transition-colors"
                 style={{ background: '#080808' }}
               >
-                {/* Index */}
-                <div className="flex items-start justify-between mb-10">
+                {/* Poster */}
+                {POSTER_MAP[concert.concertId] && (
+                  <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                    <Image
+                      src={POSTER_MAP[concert.concertId]}
+                      alt={concert.concertName}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                )}
+
+                {/* Info */}
+                <div className="flex items-start justify-between p-6">
+                  <div>
+                    <h2
+                      className="mb-1 group-hover:text-[#e8a020] transition-colors"
+                      style={{
+                        fontFamily: 'var(--font-crimson)',
+                        fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)',
+                        fontWeight: 300,
+                        fontStyle: 'italic',
+                        letterSpacing: '-0.02em',
+                        lineHeight: 1.1,
+                        color: '#ece6de',
+                      }}
+                    >
+                      {concert.concertName}
+                    </h2>
+                    <p
+                      className="text-[10px] tracking-[0.25em] uppercase"
+                      style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}
+                    >
+                      {concert.scheduleCount}회차 운영
+                    </p>
+                  </div>
                   <span
-                    className="text-[10px] tracking-[0.3em]"
-                    style={{ fontFamily: 'var(--font-mono)', color: '#2a2520' }}
-                  >
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span
-                    className="text-[10px] tracking-[0.25em] uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-[10px] tracking-[0.25em] uppercase opacity-0 group-hover:opacity-100 transition-opacity mt-1"
                     style={{ fontFamily: 'var(--font-mono)', color: '#e8a020' }}
                   >
                     선택 →
                   </span>
-                </div>
-
-                {/* Name */}
-                <div>
-                  <h2
-                    className="mb-4 group-hover:text-[#e8a020] transition-colors"
-                    style={{
-                      fontFamily: 'var(--font-crimson)',
-                      fontSize: 'clamp(1.4rem, 3vw, 2rem)',
-                      fontWeight: 300,
-                      fontStyle: 'italic',
-                      letterSpacing: '-0.02em',
-                      lineHeight: 1.1,
-                      color: '#ece6de',
-                    }}
-                  >
-                    {concert.concertName}
-                  </h2>
-                  <p
-                    className="text-[10px] tracking-[0.25em] uppercase"
-                    style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}
-                  >
-                    {concert.scheduleCount}회차 운영
-                  </p>
                 </div>
               </Link>
             ))}

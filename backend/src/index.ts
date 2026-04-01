@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 
 const app = express()
+app.set('etag', false)
 const PORT = process.env.SERVER_PORT || 4000
 
 app.use(cors({
