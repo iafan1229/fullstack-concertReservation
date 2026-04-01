@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { api, refreshQueueToken } from '@/lib/api'
 import type { ConcertItem } from '@/types'
 
 export default function ConcertsPage() {
@@ -25,7 +25,28 @@ export default function ConcertsPage() {
 
     api.get<ConcertItem[]>('/api/concerts', undefined, queueToken)
       .then(setConcerts)
-      .catch((err) => setError(err.message))
+      .catch(async (err) => {
+        if (err.status === 401) {
+          // queueToken 만료 → 갱신 후 재시도
+          const newQueueToken = await refreshQueueToken()
+          if (!newQueueToken) {
+            localStorage.removeItem('queueToken')
+            router.push('/queue')
+            return
+          }
+          api.get<ConcertItem[]>('/api/concerts', undefined, newQueueToken)
+            .then(setConcerts)
+            .catch(() => { localStorage.removeItem('queueToken'); router.push('/queue') })
+            .finally(() => setLoading(false))
+          return
+        }
+        if (err.status === 403) {
+          localStorage.removeItem('queueToken')
+          router.push('/queue')
+        } else {
+          setError(err.message)
+        }
+      })
       .finally(() => setLoading(false))
   }, [router])
 

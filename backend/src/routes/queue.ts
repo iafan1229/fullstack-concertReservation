@@ -39,6 +39,10 @@ queueRouter.post('/token', authMiddleware, async (req: Request, res: Response) =
     },
   })
 
+  const totalWaiting = await prisma.queue.count({
+    where: { status: 'TEMP' },
+  })
+
   const queueToken = jwt.sign(
     {
       queueToken: queue.token,
@@ -53,8 +57,31 @@ queueRouter.post('/token', authMiddleware, async (req: Request, res: Response) =
     queueToken,
     status: queue.status,
     position,
+    totalWaiting,
     estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
   })
+})
+
+// POST /api/queue/refresh-token — queueToken 갱신 (만료 시 재발급)
+queueRouter.post('/refresh-token', authMiddleware, async (req: Request, res: Response) => {
+  const userId = BigInt((req as any).user.id)
+
+  const queue = await prisma.queue.findFirst({
+    where: { userId, status: 'CONFIRMED' },
+  })
+
+  if (!queue) {
+    res.status(403).json({ message: '활성화된 대기열이 없습니다.' })
+    return
+  }
+
+  const queueToken = jwt.sign(
+    { queueToken: queue.token, userId: (req as any).user.userId, status: queue.status },
+    JWT_SECRET,
+    { expiresIn: '10m' }
+  )
+
+  res.json({ queueToken })
 })
 
 // GET /api/queue/status — 대기열 상태 조회 (폴링용)
@@ -88,9 +115,14 @@ queueRouter.get('/status', async (req: Request, res: Response) => {
       })
     : 0
 
+  const totalWaiting = queue.status === 'TEMP'
+    ? await prisma.queue.count({ where: { status: 'TEMP' } })
+    : 0
+
   res.json({
     status: queue.status,
     position,
+    totalWaiting,
     estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
   })
 })

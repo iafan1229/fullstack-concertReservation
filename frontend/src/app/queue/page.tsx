@@ -61,8 +61,10 @@ export default function QueuePage() {
         setErrorMsg('대기열이 만료되었습니다. 다시 시도해주세요.')
         if (intervalRef.current) clearInterval(intervalRef.current)
       }
-    } catch {
-      // 폴링 실패는 무시하고 재시도
+    } catch (err: any) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      setPhase('error')
+      setErrorMsg(err.message || '대기열 상태 확인 중 오류가 발생했습니다.')
     }
   }, [])
 
@@ -76,7 +78,7 @@ export default function QueuePage() {
     try {
       const res = await api.post<QueueTokenResponse>('/api/queue/token', {}, token)
       queueTokenRef.current = res.queueToken
-      setQueueInfo({ status: res.status, position: res.position, estimatedWaitSeconds: res.estimatedWaitSeconds })
+      setQueueInfo({ status: res.status, position: res.position, totalWaiting: res.totalWaiting, estimatedWaitSeconds: res.estimatedWaitSeconds })
 
       if (res.status === 'CONFIRMED') {
         setPhase('confirmed')
@@ -218,7 +220,7 @@ export default function QueuePage() {
                     className="text-[10px] tracking-[0.4em] uppercase mb-2"
                     style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}
                   >
-                    현재 대기 순서
+                    현재 대기 순번
                   </p>
                   <span
                     className="animate-count-in inline-block"
@@ -232,13 +234,19 @@ export default function QueuePage() {
                       letterSpacing: '-0.04em',
                     }}
                   >
-                    {queueInfo.position === 0 ? '곧 입장' : queueInfo.position}
+                    {queueInfo.position + 1}
                   </span>
+                  <p
+                    className="mt-1 text-[10px] tracking-[0.2em]"
+                    style={{ fontFamily: 'var(--font-mono)', color: '#4a4540' }}
+                  >
+                    전체 {queueInfo.totalWaiting}명 대기 중
+                  </p>
                   <p
                     className="mt-2 text-[10px] tracking-[0.3em] uppercase"
                     style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}
                   >
-                    {queueInfo.position === 0 ? '처리 중...' : `${queueInfo.estimatedWaitSeconds}초 예상`}
+                    {queueInfo.position === 0 ? '곧 입장합니다' : `약 ${queueInfo.estimatedWaitSeconds}초 예상`}
                   </p>
                 </div>
                 <div className="w-24 h-px mx-auto my-8" style={{ background: 'rgba(255,255,255,0.06)' }} />

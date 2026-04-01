@@ -173,3 +173,15 @@
 | ORM | Prisma |
 | DB | PostgreSQL |
 | 인증 | JWT |
+
+---
+
+## 7. 개발 로드맵
+
+| 단계 | 내용 | 비고 |
+|------|------|------|
+| 현재 | 프로토타입 완성 | PostgreSQL 기반 대기열, 폴링 방식 |
+| 1단계 | 기능 완성 | 예약·결제 플로우 end-to-end 동작 확인 |
+| 2단계 | Redis 교체 | 대기열 저장소를 Redis Sorted Set으로 전환, 순번 조회 최적화 |
+| 3단계 | SSE 교체 | 클라이언트 폴링 → Server-Sent Events로 전환 |
+| 4단계 | MAX_ACTIVE 동적 조정 | 서버 CPU 모니터링 기반 동적 조정 |

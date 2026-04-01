@@ -17,12 +17,14 @@ export interface QueueTokenResponse {
   queueToken: string
   status: QueueStatus
   position: number
+  totalWaiting: number
   estimatedWaitSeconds: number
 }
 
 export interface QueueStatusResponse {
   status: QueueStatus
   position: number
+  totalWaiting: number
   estimatedWaitSeconds: number
 }
 
