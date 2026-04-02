@@ -20,7 +20,7 @@
 |--------|------|
 | Concert | 콘서트 기본 정보 (이름) |
 | ConcertSchedule | 콘서트별 회차 정보 (start_at, end_at, venue). Concert와 1:N |
-| Seat | 회차별 좌석 (seat_no). ConcertSchedule과 1:N. (scheduleId, seatNo) 복합 unique |
+| Seat | 회차별 좌석 (seat_no, price). ConcertSchedule과 1:N. (scheduleId, seatNo) 복합 unique. VIP(1~10) / R석(11~30) / 일반(31~50) 등급별 가격 |
 
 ### 예약/결제 도메인
 
@@ -65,3 +65,4 @@ User
 2. **잔액은 UserBalance에 현재값**, BalanceHistory에 변동 이력을 분리 저장 — 정합성과 추적성 모두 확보.
 3. **좌석(Seat)** 은 콘서트가 아닌 **회차(ConcertSchedule)** 에 귀속 — 회차별로 독립적인 좌석 관리가 가능하다.
 4. **Reservation의 `HELD` 상태** 는 임시 점유를 나타내며, 결제 전 만료(EXPIRED) 처리가 스케줄러에서 이루어진다.
+5. **좌석 가격은 Seat 테이블에 저장** — 등급(VIP/R석/일반)별로 다르며, 예약 시점에 잔액이 즉시 차감되고 만료 시 자동 환불된다.
