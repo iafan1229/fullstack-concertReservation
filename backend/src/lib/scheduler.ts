@@ -7,6 +7,18 @@ const CONFIRMED_TTL_MS = 10 * 60 * 1000  // CONFIRMED 유효 시간 10분
 export function startQueueScheduler() {
   setInterval(async () => {
     try {
+      // 0. HELD 예약 만료 처리: expiredAt이 지난 HELD 예약 → EXPIRED
+      const expiredReservations = await prisma.reservation.updateMany({
+        where: {
+          status: 'HELD',
+          expiredAt: { lt: new Date() },
+        },
+        data: { status: 'EXPIRED' },
+      })
+      if (expiredReservations.count > 0) {
+        console.log(`[Reservation] ${expiredReservations.count}건 임시배정 만료 (EXPIRED)`)
+      }
+
       // 1. 만료 처리: CONFIRMED 상태에서 10분 초과한 항목 → EXPIRED
       const expireThreshold = new Date(Date.now() - CONFIRMED_TTL_MS)
       const expired = await prisma.queue.updateMany({

@@ -1,87 +1,31 @@
 import { Router, Request, Response } from 'express'
-import jwt from 'jsonwebtoken'
-import { randomUUID } from 'crypto'
-import { prisma } from '../lib/prisma'
 import { authMiddleware } from '../middleware/authMiddleware'
+import * as queueService from '../services/queueService'
 
 export const queueRouter = Router()
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
-const ESTIMATED_SECONDS_PER_PERSON = 10
-
-// POST /api/queue/token — 대기열 토큰 발급 (scheduleId 불필요)
+// POST /api/queue/token — 대기열 토큰 발급
 queueRouter.post('/token', authMiddleware, async (req: Request, res: Response) => {
-  const userId = BigInt((req as any).user.id)
+  const { id, userId } = (req as any).user
 
-  // 기존 유효한 Queue가 있으면 재사용
-  let queue = await prisma.queue.findFirst({
-    where: {
-      userId,
-      status: { in: ['TEMP', 'CONFIRMED'] },
-    },
-  })
-
-  if (!queue) {
-    queue = await prisma.queue.create({
-      data: {
-        userId,
-        token: randomUUID(),
-        status: 'TEMP',
-      },
-    })
+  try {
+    const result = await queueService.getOrCreateToken(BigInt(id), userId)
+    res.json(result)
+  } catch (err: any) {
+    res.status(err.statusCode ?? 500).json({ message: err.message })
   }
-
-  // 대기 순서 계산 (나보다 먼저 들어온 TEMP 수)
-  const position = await prisma.queue.count({
-    where: {
-      status: 'TEMP',
-      enteredAt: { lt: queue.enteredAt },
-    },
-  })
-
-  const totalWaiting = await prisma.queue.count({
-    where: { status: 'TEMP' },
-  })
-
-  const queueToken = jwt.sign(
-    {
-      queueToken: queue.token,
-      userId: (req as any).user.userId,
-      status: queue.status,
-    },
-    JWT_SECRET,
-    { expiresIn: '10m' }
-  )
-
-  res.json({
-    queueToken,
-    status: queue.status,
-    position,
-    totalWaiting,
-    estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
-  })
 })
 
-// POST /api/queue/refresh-token — queueToken 갱신 (만료 시 재발급)
+// POST /api/queue/refresh-token — queueToken 갱신
 queueRouter.post('/refresh-token', authMiddleware, async (req: Request, res: Response) => {
-  const userId = BigInt((req as any).user.id)
+  const { id, userId } = (req as any).user
 
-  const queue = await prisma.queue.findFirst({
-    where: { userId, status: 'CONFIRMED' },
-  })
-
-  if (!queue) {
-    res.status(403).json({ message: '활성화된 대기열이 없습니다.' })
-    return
+  try {
+    const result = await queueService.refreshToken(BigInt(id), userId)
+    res.json(result)
+  } catch (err: any) {
+    res.status(err.statusCode ?? 500).json({ message: err.message })
   }
-
-  const queueToken = jwt.sign(
-    { queueToken: queue.token, userId: (req as any).user.userId, status: queue.status },
-    JWT_SECRET,
-    { expiresIn: '10m' }
-  )
-
-  res.json({ queueToken })
 })
 
 // GET /api/queue/status — 대기열 상태 조회 (폴링용)
@@ -92,37 +36,10 @@ queueRouter.get('/status', async (req: Request, res: Response) => {
     return
   }
 
-  let payload: any
   try {
-    payload = jwt.verify(header, JWT_SECRET)
-  } catch {
-    res.status(401).json({ message: '유효하지 않거나 만료된 Queue 토큰입니다.' })
-    return
+    const result = await queueService.getStatus(header)
+    res.json(result)
+  } catch (err: any) {
+    res.status(err.statusCode ?? 500).json({ message: err.message })
   }
-
-  const queue = await prisma.queue.findUnique({ where: { token: payload.queueToken } })
-  if (!queue) {
-    res.status(404).json({ message: '대기열 정보를 찾을 수 없습니다.' })
-    return
-  }
-
-  const position = queue.status === 'TEMP'
-    ? await prisma.queue.count({
-        where: {
-          status: 'TEMP',
-          enteredAt: { lt: queue.enteredAt },
-        },
-      })
-    : 0
-
-  const totalWaiting = queue.status === 'TEMP'
-    ? await prisma.queue.count({ where: { status: 'TEMP' } })
-    : 0
-
-  res.json({
-    status: queue.status,
-    position,
-    totalWaiting,
-    estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
-  })
 })
