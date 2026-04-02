@@ -1,7 +1,6 @@
 import { prisma } from '../lib/prisma'
 
 const HELD_DURATION_MS = 5 * 60 * 1000 // 5분
-const TICKET_PRICE = 50000n             // 좌석 고정 가격: 5만원
 
 export async function createReservation(
   scheduleId: bigint,
@@ -32,19 +31,19 @@ export async function createReservation(
     const userBalance = await tx.userBalance.findUnique({
       where: { userId: queue.userId },
     })
-    if (!userBalance || userBalance.balance < TICKET_PRICE) {
+    if (!userBalance || userBalance.balance < seat.price) {
       throw Object.assign(new Error('잔액이 부족합니다.'), { statusCode: 400 })
     }
 
     // 4. 잔액 차감
     await tx.userBalance.update({
       where: { userId: queue.userId },
-      data: { balance: { decrement: TICKET_PRICE } },
+      data: { balance: { decrement: seat.price } },
     })
 
     // 5. 잔액 사용 이력
     await tx.balanceHistory.create({
-      data: { userId: queue.userId, amount: TICKET_PRICE, type: 'USE' },
+      data: { userId: queue.userId, amount: seat.price, type: 'USE' },
     })
 
     // 6. 예약 생성 (HELD)
@@ -66,7 +65,7 @@ export async function createReservation(
     await tx.payment.create({
       data: {
         reservationId: reservation.id,
-        amount: TICKET_PRICE,
+        amount: seat.price,
         status: 'PENDING',
       },
     })
@@ -75,7 +74,7 @@ export async function createReservation(
       id: reservation.id.toString(),
       seatNo: reservation.seat.seatNo,
       status: reservation.status,
-      amount: TICKET_PRICE.toString(),
+      amount: seat.price.toString(),
       heldAt: reservation.heldAt,
       expiredAt: reservation.expiredAt,
     }

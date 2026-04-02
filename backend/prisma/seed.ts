@@ -12,6 +12,13 @@ const concerts = [
 
 const venues = ['올림픽공원 체조경기장', 'KSPO DOME', '잠실종합운동장', '고척스카이돔', '인천 문학경기장']
 
+// 좌석 등급별 가격: VIP(1~10) / R석(11~30) / 일반(31~50)
+function getSeatPrice(seatNo: number): bigint {
+  if (seatNo <= 10) return 150000n  // VIP
+  if (seatNo <= 30) return 100000n  // R석
+  return 70000n                      // 일반
+}
+
 async function main() {
   console.log('🌱 Seeding...')
 
@@ -51,11 +58,12 @@ async function main() {
         },
       })
 
-      // 스케줄당 좌석 50개 (1~50)
+      // 스케줄당 좌석 50개 (1~50), 등급별 가격 적용
       await prisma.seat.createMany({
         data: Array.from({ length: 50 }, (_, idx) => ({
           scheduleId: schedule.id,
           seatNo: String(idx + 1),
+          price: getSeatPrice(idx + 1),
         })),
       })
 

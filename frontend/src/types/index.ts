@@ -47,6 +47,7 @@ export interface ScheduleItem {
 export interface SeatItem {
   id: string
   seatNo: string
+  price: string
   available: boolean
 }
 

@@ -6,6 +6,13 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import type { SeatItem, ReservationItem } from '@/types'
 
+function getSeatGrade(seatNo: string) {
+  const n = Number(seatNo)
+  if (n <= 10) return { label: 'VIP', color: '#9060d0' }
+  if (n <= 30) return { label: 'R석', color: '#e8a020' }
+  return { label: '일반', color: '#3a9878' }
+}
+
 function useCountdown(expiredAt: string | null) {
   const [secondsLeft, setSecondsLeft] = useState<number>(0)
 
@@ -152,18 +159,19 @@ export default function SeatsPage() {
         {!loading && !error && (
           <>
             {/* Legend */}
-            <div className="flex items-center gap-6 mb-8">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-8">
               {[
-                { color: '#e8a020', label: '예약 가능' },
+                { color: '#9060d0', label: 'VIP · 150,000원' },
+                { color: '#e8a020', label: 'R석 · 100,000원' },
+                { color: '#3a9878', label: '일반 · 70,000원' },
                 { color: '#1e1e1e', label: '예약 불가', border: 'rgba(255,255,255,0.06)' },
-                { color: 'rgba(232,160,32,0.15)', label: '선택됨', border: '#e8a020' },
               ].map(({ color, label, border }) => (
                 <div key={label} className="flex items-center gap-2">
                   <div
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     style={{ background: color, border: `1px solid ${border || color}` }}
                   />
-                  <span className="text-[10px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-mono)', color: '#4a4540' }}>
+                  <span className="text-[10px] tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)', color: '#4a4540' }}>
                     {label}
                   </span>
                 </div>
@@ -188,6 +196,7 @@ export default function SeatsPage() {
               {seats.map((seat) => {
                 const isSelected = selected?.id === seat.id
                 const isReserved = reservation?.seatNo === seat.seatNo
+                const grade = getSeatGrade(seat.seatNo)
                 return (
                   <button
                     key={seat.id}
@@ -199,21 +208,21 @@ export default function SeatsPage() {
                       background: isReserved
                         ? 'rgba(100,200,100,0.15)'
                         : isSelected
-                        ? 'rgba(232,160,32,0.15)'
+                        ? `${grade.color}22`
                         : seat.available
-                        ? '#e8a020'
+                        ? grade.color
                         : '#111111',
                       color: isReserved
                         ? '#64c864'
                         : isSelected
-                        ? '#e8a020'
+                        ? grade.color
                         : seat.available
-                        ? '#080808'
+                        ? '#fff'
                         : '#2a2520',
                       border: isReserved
                         ? '1px solid #64c864'
                         : isSelected
-                        ? '1px solid #e8a020'
+                        ? `1px solid ${grade.color}`
                         : seat.available
                         ? 'none'
                         : '1px solid rgba(255,255,255,0.04)',
@@ -314,7 +323,7 @@ export default function SeatsPage() {
                   <>
                     <div>
                       <p className="text-[10px] tracking-[0.3em] uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', color: '#5a5550' }}>
-                        선택한 좌석
+                        {getSeatGrade(selected.seatNo).label} · {Number(selected.price).toLocaleString('ko-KR')}원
                       </p>
                       <p
                         style={{
@@ -322,7 +331,7 @@ export default function SeatsPage() {
                           fontSize: '1.8rem',
                           fontWeight: 300,
                           fontStyle: 'italic',
-                          color: '#e8a020',
+                          color: getSeatGrade(selected.seatNo).color,
                           letterSpacing: '-0.02em',
                         }}
                       >

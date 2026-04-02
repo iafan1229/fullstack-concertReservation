@@ -72,6 +72,7 @@ export async function getSeats(scheduleId: bigint) {
   return seats.map((seat) => ({
     id: seat.id.toString(),
     seatNo: seat.seatNo,
+    price: seat.price.toString(),
     available: seat.reservations.length === 0,
   }))
 }

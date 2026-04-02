@@ -84,6 +84,7 @@ model Seat {
   id         BigInt @id @default(autoincrement())
   scheduleId BigInt @map("schedule_id")
   seatNo     String @map("seat_no")
+  price      BigInt @default(0)
 
   schedule     ConcertSchedule @relation(fields: [scheduleId], references: [id])
   reservations Reservation[]
