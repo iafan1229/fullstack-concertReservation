@@ -49,3 +49,16 @@ export interface SeatItem {
   seatNo: string
   available: boolean
 }
+
+export interface BalanceResponse {
+  userId: string
+  balance: string
+}
+
+export interface ReservationItem {
+  id: string
+  seatNo: string
+  status: 'HELD' | 'CONFIRMED' | 'EXPIRED'
+  heldAt: string
+  expiredAt: string
+}

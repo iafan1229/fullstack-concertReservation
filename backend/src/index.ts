@@ -20,12 +20,16 @@ import { authRouter } from './routes/auth'
 import { queueRouter } from './routes/queue'
 import { concertsRouter } from './routes/concerts'
 import { reservationsRouter } from './routes/reservations'
+import { balanceRouter } from './routes/balance'
+import { paymentsRouter } from './routes/payments'
 import { startQueueScheduler } from './lib/scheduler'
 
 app.use('/api/auth', authRouter)
 app.use('/api/queue', queueRouter)
 app.use('/api/concerts', concertsRouter)
 app.use('/api/reservations', reservationsRouter)
+app.use('/api/balance', balanceRouter)
+app.use('/api/payments', paymentsRouter)
 
 app.listen(PORT, () => {
   console.log(`[backend] http://localhost:${PORT} 에서 실행 중`)

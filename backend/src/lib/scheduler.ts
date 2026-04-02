@@ -7,16 +7,41 @@ const CONFIRMED_TTL_MS = 10 * 60 * 1000  // CONFIRMED 유효 시간 10분
 export function startQueueScheduler() {
   setInterval(async () => {
     try {
-      // 0. HELD 예약 만료 처리: expiredAt이 지난 HELD 예약 → EXPIRED
-      const expiredReservations = await prisma.reservation.updateMany({
-        where: {
-          status: 'HELD',
-          expiredAt: { lt: new Date() },
-        },
-        data: { status: 'EXPIRED' },
+      // 0. HELD 예약 만료 처리: expiredAt이 지난 HELD 예약 → EXPIRED + 잔액 환불
+      const expiredHeld = await prisma.reservation.findMany({
+        where: { status: 'HELD', expiredAt: { lt: new Date() } },
+        include: { payment: true },
       })
-      if (expiredReservations.count > 0) {
-        console.log(`[Reservation] ${expiredReservations.count}건 임시배정 만료 (EXPIRED)`)
+
+      for (const reservation of expiredHeld) {
+        await prisma.$transaction(async (tx) => {
+          await tx.reservation.update({
+            where: { id: reservation.id },
+            data: { status: 'EXPIRED' },
+          })
+
+          if (reservation.payment && reservation.payment.status === 'PENDING') {
+            await tx.payment.update({
+              where: { id: reservation.payment.id },
+              data: { status: 'REFUNDED' },
+            })
+            await tx.userBalance.update({
+              where: { userId: reservation.userId },
+              data: { balance: { increment: reservation.payment.amount } },
+            })
+            await tx.balanceHistory.create({
+              data: {
+                userId: reservation.userId,
+                amount: reservation.payment.amount,
+                type: 'REFUND',
+              },
+            })
+          }
+        })
+      }
+
+      if (expiredHeld.length > 0) {
+        console.log(`[Reservation] ${expiredHeld.length}건 임시배정 만료 및 환불 처리`)
       }
 
       // 1. 만료 처리: CONFIRMED 상태에서 10분 초과한 항목 → EXPIRED

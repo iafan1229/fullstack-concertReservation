@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { api, refreshQueueToken } from '@/lib/api'
-import type { ConcertItem } from '@/types'
+import type { ConcertItem, BalanceResponse } from '@/types'
 
 const POSTER_MAP: Record<string, string> = {
   'concert-001': '/concerts/jazz.webp',
@@ -21,6 +21,7 @@ export default function ConcertsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [userName, setUserName] = useState('')
+  const [balance, setBalance] = useState<string | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -30,7 +31,13 @@ export default function ConcertsPage() {
     if (!queueToken) { router.push('/queue'); return }
 
     const user = localStorage.getItem('user')
-    if (user) setUserName(JSON.parse(user).name)
+    if (user) {
+      const parsed = JSON.parse(user)
+      setUserName(parsed.name)
+      api.get<BalanceResponse>(`/api/balance?userId=${parsed.userId}`, token)
+        .then((res) => setBalance(res.balance))
+        .catch(() => {})
+    }
 
     api.get<ConcertItem[]>('/api/concerts', undefined, queueToken)
       .then(setConcerts)
@@ -83,6 +90,15 @@ export default function ConcertsPage() {
             <span className="text-[11px] tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)', color: '#4a4540' }}>
               {userName}
             </span>
+          )}
+          {balance !== null && (
+            <Link
+              href="/balance"
+              className="text-[11px] tracking-[0.15em] hover:text-[#e8a020] transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', color: '#e8a020' }}
+            >
+              {Number(balance).toLocaleString('ko-KR')}원
+            </Link>
           )}
           <button
             onClick={handleLogout}
