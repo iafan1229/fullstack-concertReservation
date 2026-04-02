@@ -59,7 +59,17 @@ export interface BalanceResponse {
 export interface ReservationItem {
   id: string
   seatNo: string
+  amount: string
   status: 'HELD' | 'CONFIRMED' | 'EXPIRED'
   heldAt: string
   expiredAt: string
+}
+
+export interface PaymentResponse {
+  reservationId: string
+  paymentId: string
+  seatId: string
+  amount: string
+  status: 'SUCCESS'
+  paidAt: string
 }

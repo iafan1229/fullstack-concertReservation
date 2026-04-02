@@ -303,9 +303,18 @@ export default function SeatsPage() {
                   )}
                 </div>
                 {secondsLeft > 0 && (
-                  <p className="mt-4 text-[10px] tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}>
-                    결제를 완료하지 않으면 배정이 자동으로 해제됩니다
-                  </p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-[10px] tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)', color: '#3a3530' }}>
+                      결제를 완료하지 않으면 배정이 자동으로 해제됩니다
+                    </p>
+                    <button
+                      onClick={() => router.push(`/payment/${reservation.id}?seatNo=${reservation.seatNo}&amount=${reservation.amount}&expiredAt=${encodeURIComponent(reservation.expiredAt)}`)}
+                      className="px-5 py-2 text-[11px] tracking-[0.2em] uppercase"
+                      style={{ fontFamily: 'var(--font-mono)', background: '#e8a020', color: '#080808', fontWeight: 500 }}
+                    >
+                      결제하기 →
+                    </button>
+                  </div>
                 )}
               </div>
             )}

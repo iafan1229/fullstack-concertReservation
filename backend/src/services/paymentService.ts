@@ -1,6 +1,10 @@
 import { prisma } from '../lib/prisma'
 
-export async function confirmPayment(reservationId: bigint, userId: bigint) {
+export async function confirmPayment(
+  reservationId: bigint,
+  userId: bigint,
+  queueId: bigint
+) {
   return prisma.$transaction(async (tx) => {
     // 1. 예약 조회
     const reservation = await tx.reservation.findUnique({
@@ -21,32 +25,33 @@ export async function confirmPayment(reservationId: bigint, userId: bigint) {
       throw Object.assign(new Error('결제 정보를 찾을 수 없습니다.'), { statusCode: 400 })
     }
 
-    // 2. Reservation → CONFIRMED
+    const now = new Date()
+
+    // 2. Reservation → CONFIRMED (좌석 소유권 배정)
     await tx.reservation.update({
       where: { id: reservationId },
-      data: { status: 'CONFIRMED', confirmedAt: new Date() },
+      data: { status: 'CONFIRMED', confirmedAt: now },
     })
 
     // 3. Payment → SUCCESS
     await tx.payment.update({
       where: { id: reservation.payment.id },
-      data: { status: 'SUCCESS', paidAt: new Date() },
+      data: { status: 'SUCCESS', paidAt: now },
     })
 
     // 4. Queue → EXPIRED (대기열 토큰 만료)
-    if (reservation.queueId) {
-      await tx.queue.update({
-        where: { id: reservation.queueId },
-        data: { status: 'EXPIRED' },
-      })
-    }
+    await tx.queue.update({
+      where: { id: queueId },
+      data: { status: 'EXPIRED' },
+    })
 
     return {
       reservationId: reservationId.toString(),
       paymentId: reservation.payment.id.toString(),
+      seatId: reservation.seatId.toString(),
       amount: reservation.payment.amount.toString(),
       status: 'SUCCESS',
-      paidAt: new Date(),
+      paidAt: now,
     }
   })
 }

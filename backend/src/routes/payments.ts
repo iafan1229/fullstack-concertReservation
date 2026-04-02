@@ -19,7 +19,8 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
   try {
     const result = await paymentService.confirmPayment(
       BigInt(reservationId),
-      queue.userId
+      queue.userId,
+      queue.id
     )
     res.status(200).json(result)
   } catch (err: any) {
