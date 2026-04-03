@@ -218,3 +218,51 @@
 | 2단계 | Redis 교체 | 대기열 저장소를 Redis Sorted Set으로 전환, 순번 조회 최적화 |
 | 3단계 | SSE 교체 | 클라이언트 폴링 → Server-Sent Events로 전환 |
 | 4단계 | MAX_ACTIVE 동적 조정 | 서버 CPU 모니터링 기반 동적 조정 |
+
+---
+
+## 9. Redis 도입 계획
+
+| 문제 | Redis 기능 |
+|------|------|
+| DB 폴링 | Pub/Sub — 변화를 푸시 |
+| 레이스 컨디션 | 분산 락 (SET NX) — 동시 접근 차단 |
+| 반복 DB 쿼리 | 캐시 (GET/SET TTL) — 결과 저장 |
+
+---
+
+## 10. 배포 기준 실행 계획
+
+### Phase 1 — 환경 구성
+- 로컬: Docker Compose로 Redis 추가
+- 배포: AWS ElastiCache 또는 Upstash
+- 패키지: `ioredis` 설치
+- `backend/src/lib/redis.ts` 싱글턴 클라이언트 생성
+
+### Phase 2 — 좌석 분산 락 (우선순위 최상)
+- 예약 생성 전 `SET seat:{seatId}:lock {userId} NX EX 10` 으로 락 획득
+- 락 획득 실패 시 "다른 사용자가 선택 중" 즉시 반환
+- 예약 완료/실패 후 락 해제
+
+### Phase 3 — 대기열 Redis화
+- 대기 순번 → Redis Sorted Set (`ZADD`, `ZRANK`)
+- 스케줄러 중복 실행 방지 → 분산 락으로 단일 인스턴스만 실행
+
+### Phase 4 — 캐싱
+- `GET /api/concerts`, `GET /api/concerts/:id/schedules` → Redis 캐시 (TTL 60s)
+- 좌석 변경 시 캐시 무효화
+
+### Phase 5 — 배포 인프라
+
+```
+[Client]
+    ↓
+[CloudFront / CDN]
+    ↓              ↓
+[Next.js - Vercel]  [ALB]
+                     ↓
+              [Node.js x N instances]
+                   ↓       ↓
+             [PostgreSQL] [Redis]
+             (RDS)    (ElastiCache)
+```
