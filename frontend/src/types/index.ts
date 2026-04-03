@@ -65,6 +65,19 @@ export interface ReservationItem {
   expiredAt: string
 }
 
+export interface ReservationDetail {
+  id: string
+  status: 'HELD' | 'CONFIRMED' | 'EXPIRED' | 'CANCELED'
+  seatNo: string
+  amount: string
+  heldAt: string
+  expiredAt: string | null
+  confirmedAt: string | null
+  concertName: string
+  startAt: string
+  venue: string | null
+}
+
 export interface PaymentResponse {
   reservationId: string
   paymentId: string

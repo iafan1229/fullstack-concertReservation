@@ -2,6 +2,85 @@ import { prisma } from '../lib/prisma'
 
 const HELD_DURATION_MS = 5 * 60 * 1000 // 5분
 
+export async function getUserReservations(userId: bigint) {
+  const reservations = await prisma.reservation.findMany({
+    where: {
+      userId,
+      status: { in: ['HELD', 'CONFIRMED', 'CANCELED'] },
+    },
+    include: {
+      seat: {
+        include: {
+          schedule: {
+            include: { concert: true },
+          },
+        },
+      },
+      payment: true,
+    },
+    orderBy: { heldAt: 'desc' },
+  })
+
+  return reservations.map((r) => ({
+    id: r.id.toString(),
+    status: r.status,
+    seatNo: r.seat.seatNo,
+    amount: r.payment?.amount.toString() ?? '0',
+    heldAt: r.heldAt,
+    expiredAt: r.expiredAt,
+    confirmedAt: r.confirmedAt,
+    concertName: r.seat.schedule.concert.concertName,
+    startAt: r.seat.schedule.startAt,
+    venue: r.seat.schedule.venue,
+  }))
+}
+
+export async function cancelReservation(reservationId: bigint, userId: bigint) {
+  return prisma.$transaction(async (tx) => {
+    const reservation = await tx.reservation.findUnique({
+      where: { id: reservationId },
+      include: { payment: true },
+    })
+
+    if (!reservation) {
+      throw Object.assign(new Error('예약을 찾을 수 없습니다.'), { statusCode: 404 })
+    }
+    if (reservation.userId !== userId) {
+      throw Object.assign(new Error('본인의 예약만 취소할 수 있습니다.'), { statusCode: 403 })
+    }
+    if (!['HELD', 'CONFIRMED'].includes(reservation.status)) {
+      throw Object.assign(new Error('취소할 수 없는 상태입니다.'), { statusCode: 400 })
+    }
+
+    // 1. Reservation → CANCELED
+    await tx.reservation.update({
+      where: { id: reservationId },
+      data: { status: 'CANCELED' },
+    })
+
+    // 2. Payment → REFUNDED + 잔액 환불
+    if (reservation.payment) {
+      await tx.payment.update({
+        where: { id: reservation.payment.id },
+        data: { status: 'REFUNDED' },
+      })
+      await tx.userBalance.update({
+        where: { userId },
+        data: { balance: { increment: reservation.payment.amount } },
+      })
+      await tx.balanceHistory.create({
+        data: {
+          userId,
+          amount: reservation.payment.amount,
+          type: 'REFUND',
+        },
+      })
+    }
+
+    return { reservationId: reservationId.toString(), status: 'CANCELED' }
+  })
+}
+
 export async function createReservation(
   scheduleId: bigint,
   seatNo: string,

@@ -91,6 +91,13 @@ export default function ConcertsPage() {
               {userName}
             </span>
           )}
+          <Link
+            href="/reservations"
+            className="text-[11px] tracking-[0.15em] uppercase hover:text-[#e8a020] transition-colors"
+            style={{ fontFamily: 'var(--font-mono)', color: '#4a4540' }}
+          >
+            내 예약
+          </Link>
           {balance !== null && (
             <Link
               href="/balance"
