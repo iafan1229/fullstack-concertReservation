@@ -255,14 +255,16 @@
 ### Phase 5 — 배포 인프라
 
 ```
-[Client]
-    ↓
-[CloudFront / CDN]
-    ↓              ↓
-[Next.js - Vercel]  [ALB]
-                     ↓
-              [Node.js x N instances]
-                   ↓       ↓
-             [PostgreSQL] [Redis]
-             (RDS)    (ElastiCache)
+[유저]
+  ↓
+[Route 53] ← 도메인 (example.com)
+  ↓
+[CloudFront] ← CDN, HTTPS
+  ↓              ↓
+[S3 or Vercel]  [ALB] ← 로드 밸런서
+(Next.js)         ↓
+              [ECS or EC2]  ← Express 컨테이너
+               ↓       ↓
+            [RDS]   [ElastiCache]
+          (PostgreSQL)  (Redis)
 ```
