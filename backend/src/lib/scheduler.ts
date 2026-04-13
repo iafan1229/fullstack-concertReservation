@@ -97,6 +97,23 @@ export function startQueueScheduler() {
         data: { status: 'CONFIRMED', confirmedAt: new Date() },
       })
 
+      // 승격된 유저에게 SSE 알림 (Redis Pub/Sub)
+      for (const userId of toActivate) {
+        await redis.publish(
+          `queue:events:${userId}`,
+          JSON.stringify({ status: 'CONFIRMED', position: 0, totalWaiting: 0, estimatedWaitSeconds: 0 })
+        )
+      }
+
+      // 남은 대기자에게 순번 업데이트 SSE 알림
+      const remaining = await redis.zrange(QUEUE_WAITING, 0, -1)
+      for (let i = 0; i < remaining.length; i++) {
+        await redis.publish(
+          `queue:events:${remaining[i]}`,
+          JSON.stringify({ status: 'TEMP', position: i, totalWaiting: remaining.length, estimatedWaitSeconds: i * 10 })
+        )
+      }
+
       console.log(`[Queue] ${toActivate.length}명 활성화 (CONFIRMED: ${confirmedCount + toActivate.length}/${MAX_ACTIVE})`)
     } catch (err) {
       console.error('[Queue Scheduler Error]', err)

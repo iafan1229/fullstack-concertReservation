@@ -43,7 +43,7 @@ export async function getOrCreateToken(userDbId: bigint, userPublicId: string) {
   return {
     queueToken,
     status: queue.status,
-    position,기
+    position,
     totalWaiting,
     estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
   }

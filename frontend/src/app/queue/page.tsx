@@ -20,7 +20,9 @@ const STATUS_COLOR: Record<QueueStatus, string> = {
   EXPIRED: '#5a5550',
 }
 
-type Phase = 'idle' | 'polling' | 'confirmed' | 'error'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+
+type Phase = 'idle' | 'streaming' | 'confirmed' | 'error'
 
 export default function QueuePage() {
   const router = useRouter()
@@ -29,7 +31,7 @@ export default function QueuePage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
   const queueTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -42,29 +44,38 @@ export default function QueuePage() {
     if (user) setUserName(JSON.parse(user).name)
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (eventSourceRef.current) eventSourceRef.current.close()
     }
   }, [router])
 
-  const pollStatus = useCallback(async () => {
-    const qt = queueTokenRef.current
-    if (!qt) return
-    try {
-      const res = await api.get<QueueStatusResponse>('/api/queue/status', undefined, qt)
-      setQueueInfo(res)
-      if (res.status === 'CONFIRMED') {
+  const startSSE = useCallback(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const source = new EventSource(
+      `${API_URL}/api/queue/stream?token=${encodeURIComponent(token)}`
+    )
+    eventSourceRef.current = source
+
+    source.onmessage = (event) => {
+      const data: QueueStatusResponse = JSON.parse(event.data)
+      setQueueInfo(data)
+
+      if (data.status === 'CONFIRMED') {
         setPhase('confirmed')
-        localStorage.setItem('queueToken', qt)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-      } else if (res.status === 'CANCELED' || res.status === 'EXPIRED') {
+        localStorage.setItem('queueToken', queueTokenRef.current!)
+        source.close()
+      } else if (data.status === 'CANCELED' || data.status === 'EXPIRED') {
         setPhase('error')
         setErrorMsg('대기열이 만료되었습니다. 다시 시도해주세요.')
-        if (intervalRef.current) clearInterval(intervalRef.current)
+        source.close()
       }
-    } catch (err: any) {
-      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+
+    source.onerror = () => {
       setPhase('error')
-      setErrorMsg(err.message || '대기열 상태 확인 중 오류가 발생했습니다.')
+      setErrorMsg('연결이 끊어졌습니다.')
+      source.close()
     }
   }, [])
 
@@ -84,8 +95,8 @@ export default function QueuePage() {
         setPhase('confirmed')
         localStorage.setItem('queueToken', res.queueToken)
       } else {
-        setPhase('polling')
-        intervalRef.current = setInterval(pollStatus, 3000)
+        setPhase('streaming')
+        startSSE()
       }
     } catch (err: any) {
       setErrorMsg(err.message)
@@ -197,7 +208,7 @@ export default function QueuePage() {
         )}
 
         {/* POLLING / CONFIRMED */}
-        {(phase === 'polling' || phase === 'confirmed') && queueInfo && (
+        {(phase === 'streaming' || phase === 'confirmed') && queueInfo && (
           <div className="w-full max-w-lg text-center animate-fade-up">
             {/* Status badge */}
             <div className="flex items-center justify-center gap-2 mb-10">
@@ -213,7 +224,7 @@ export default function QueuePage() {
               </span>
             </div>
 
-            {phase === 'polling' ? (
+            {phase === 'streaming' ? (
               <>
                 <div className="relative mb-4">
                   <p
@@ -251,7 +262,7 @@ export default function QueuePage() {
                 </div>
                 <div className="w-24 h-px mx-auto my-8" style={{ background: 'rgba(255,255,255,0.06)' }} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#3a3530' }}>
-                  3초마다 자동으로 갱신됩니다
+                  실시간으로 갱신됩니다
                 </p>
               </>
             ) : (
@@ -295,7 +306,7 @@ export default function QueuePage() {
 
             <button
               onClick={() => {
-                if (intervalRef.current) clearInterval(intervalRef.current)
+                if (eventSourceRef.current) eventSourceRef.current.close()
                 setPhase('idle')
                 setQueueInfo(null)
                 queueTokenRef.current = null
