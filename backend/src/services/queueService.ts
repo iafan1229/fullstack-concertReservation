@@ -1,9 +1,12 @@
 import jwt from 'jsonwebtoken'
 import { randomUUID } from 'crypto'
 import { prisma } from '../lib/prisma'
+import { redis } from '../lib/redis'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 const ESTIMATED_SECONDS_PER_PERSON = 10
+
+const QUEUE_WAITING = 'queue:waiting'
 
 function signQueueToken(queueToken: string, userId: string, status: string) {
   return jwt.sign({ queueToken, userId, status }, JWT_SECRET, { expiresIn: '10m' })
@@ -25,25 +28,22 @@ export async function getOrCreateToken(userDbId: bigint, userPublicId: string) {
         status: 'TEMP',
       },
     })
+
+    // Redis Sorted Set에 추가 (점수 = 타임스탬프)
+    await redis.zadd(QUEUE_WAITING, queue.enteredAt.getTime(), userDbId.toString())
   }
 
-  const position = await prisma.queue.count({
-    where: {
-      status: 'TEMP',
-      enteredAt: { lt: queue.enteredAt },
-    },
-  })
-
-  const totalWaiting = await prisma.queue.count({
-    where: { status: 'TEMP' },
-  })
+  // 순번/대기인원을 Redis에서 조회
+  const rank = await redis.zrank(QUEUE_WAITING, userDbId.toString())
+  const position = rank !== null ? rank : 0
+  const totalWaiting = await redis.zcard(QUEUE_WAITING)
 
   const queueToken = signQueueToken(queue.token!, userPublicId, queue.status)
 
   return {
     queueToken,
     status: queue.status,
-    position,
+    position,기
     totalWaiting,
     estimatedWaitSeconds: position * ESTIMATED_SECONDS_PER_PERSON,
   }
@@ -75,15 +75,15 @@ export async function getStatus(rawToken: string) {
     throw Object.assign(new Error('대기열 정보를 찾을 수 없습니다.'), { statusCode: 404 })
   }
 
-  const position = queue.status === 'TEMP'
-    ? await prisma.queue.count({
-        where: { status: 'TEMP', enteredAt: { lt: queue.enteredAt } },
-      })
-    : 0
+  // Redis에서 순번 조회 (TEMP일 때만)
+  let position = 0
+  let totalWaiting = 0
 
-  const totalWaiting = queue.status === 'TEMP'
-    ? await prisma.queue.count({ where: { status: 'TEMP' } })
-    : 0
+  if (queue.status === 'TEMP') {
+    const rank = await redis.zrank(QUEUE_WAITING, queue.userId.toString())
+    position = rank !== null ? rank : 0
+    totalWaiting = await redis.zcard(QUEUE_WAITING)
+  }
 
   return {
     status: queue.status,

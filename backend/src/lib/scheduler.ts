@@ -1,12 +1,21 @@
 import { prisma } from './prisma'
+import { redis } from './redis'
 
-const MAX_ACTIVE = 5           // 동시 활성 최대 인원
-const INTERVAL_MS = 10_000    // 10초 간격
-const CONFIRMED_TTL_MS = 10 * 60 * 1000  // CONFIRMED 유효 시간 10분
+const MAX_ACTIVE = 5
+const INTERVAL_MS = 10_000
+const CONFIRMED_TTL_MS = 10 * 60 * 1000
+
+const QUEUE_WAITING = 'queue:waiting'
+const QUEUE_ACTIVE = 'queue:active'
+const SCHEDULER_LOCK = 'scheduler:lock'
 
 export function startQueueScheduler() {
   setInterval(async () => {
     try {
+      // 분산 락: 인스턴스 하나만 스케줄러 실행
+      const lockAcquired = await redis.set(SCHEDULER_LOCK, '1', 'EX', 15, 'NX')
+      if (!lockAcquired) return
+
       // 0. HELD 예약 만료 처리: expiredAt이 지난 HELD 예약 → EXPIRED + 잔액 환불
       const expiredHeld = await prisma.reservation.findMany({
         where: { status: 'HELD', expiredAt: { lt: new Date() } },
@@ -44,39 +53,47 @@ export function startQueueScheduler() {
         console.log(`[Reservation] ${expiredHeld.length}건 임시배정 만료 및 환불 처리`)
       }
 
-      // 1. 만료 처리: CONFIRMED 상태에서 10분 초과한 항목 → EXPIRED
-      const expireThreshold = new Date(Date.now() - CONFIRMED_TTL_MS)
-      const expired = await prisma.queue.updateMany({
-        where: {
-          status: 'CONFIRMED',
-          confirmedAt: { lt: expireThreshold },
-        },
-        data: { status: 'EXPIRED' },
-      })
-      if (expired.count > 0) {
-        console.log(`[Queue] ${expired.count}명 만료 처리 (EXPIRED)`)
+      // 1. CONFIRMED 만료: Redis queue:active에서 TTL 초과 항목 제거
+      const expireThreshold = Date.now() - CONFIRMED_TTL_MS
+      const expiredMembers = await redis.zrangebyscore(QUEUE_ACTIVE, 0, expireThreshold)
+
+      if (expiredMembers.length > 0) {
+        await redis.zrem(QUEUE_ACTIVE, ...expiredMembers)
+
+        // DB 동기화
+        const expiredUserIds = expiredMembers.map((id) => BigInt(id))
+        await prisma.queue.updateMany({
+          where: {
+            userId: { in: expiredUserIds },
+            status: 'CONFIRMED',
+          },
+          data: { status: 'EXPIRED' },
+        })
+        console.log(`[Queue] ${expiredMembers.length}명 만료 처리 (EXPIRED)`)
       }
 
-      // 2. 현재 CONFIRMED 수 확인
-      const confirmedCount = await prisma.queue.count({
-        where: { status: 'CONFIRMED' },
-      })
-
+      // 2. 빈 슬롯 계산
+      const confirmedCount = await redis.zcard(QUEUE_ACTIVE)
       const slots = MAX_ACTIVE - confirmedCount
       if (slots <= 0) return
 
-      // 3. 가장 오래 기다린 TEMP 유저 선택 (선착순)
-      const toActivate = await prisma.queue.findMany({
-        where: { status: 'TEMP' },
-        orderBy: { enteredAt: 'asc' },
-        take: slots,
-        select: { id: true },
-      })
+      // 3. 대기열에서 선착순으로 승격 대상 꺼내기
+      const toActivate = await redis.zrange(QUEUE_WAITING, 0, slots - 1)
       if (toActivate.length === 0) return
 
-      // 4. CONFIRMED로 일괄 업데이트 + confirmedAt 기록
+      // 4. Redis: waiting에서 제거 → active에 추가
+      await redis.zrem(QUEUE_WAITING, ...toActivate)
+      const now = Date.now()
+      const activeEntries = toActivate.flatMap((userId) => [now, userId])
+      await redis.zadd(QUEUE_ACTIVE, ...activeEntries)
+
+      // 5. DB 동기화: TEMP → CONFIRMED
+      const activateUserIds = toActivate.map((id) => BigInt(id))
       await prisma.queue.updateMany({
-        where: { id: { in: toActivate.map((q) => q.id) } },
+        where: {
+          userId: { in: activateUserIds },
+          status: 'TEMP',
+        },
         data: { status: 'CONFIRMED', confirmedAt: new Date() },
       })
 
